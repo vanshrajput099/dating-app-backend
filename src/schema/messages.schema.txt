@@ -1,0 +1,9 @@
+## Message Schema
+
+--> senderUsername
+--> recieverUsername
+--> message 
+--> image
+--> seenBySender
+--> seenByReciever
+--> createdAt

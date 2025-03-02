@@ -1,0 +1,5 @@
+## Token Schema
+
+--> Token Id
+--> username
+--> expiry

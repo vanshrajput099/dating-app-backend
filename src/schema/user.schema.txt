@@ -1,0 +1,22 @@
+neo4j doesnot use any fixed schema 
+But I am defining here - 
+What I Am Going To Store -->
+
+## USER SCHEMA -->
+
+username - UNIQUE
+fullName 
+gmail - UNIQUE
+bio 
+avatar
+photos
+gender - M / F
+genderPrefrence - M / F / BOTH
+dateOfBirth
+password - HASHED
+hobbies - Array of Strings
+isVerified
+lastOnline
+location
+createdAt
+updatedAt
