@@ -4,12 +4,10 @@ import asynchandler from "../utils/asynchandler.js";
 import { comparePassword, encryptUserPassword } from "../utils/user.fun.js";
 import { uploadFileOnCloudinary } from "../utils/cloudinary.js";
 import fs from "fs";
-import { v4 as uuidv4 } from 'uuid';
 import { sendMailFunction } from "../utils/nodemailer.js";
 import { createAccessToken, createRefreshToken } from "../utils/jsonToken.js";
 import APIResponse from "../utils/APIResponse.js";
 import { getSocketId, io } from "../app.js";
-import { createNotification } from "./notifications.controller.js";
 
 export const checkUsername = asynchandler(async (req, res) => {
     const { username } = req.body;
@@ -564,19 +562,67 @@ export const swipeUser = asynchandler(async (req, res) => {
 
         if (checkMatch.records.length > 0) {
 
-            const currentUserSocketID = getSocketId(username);
-            const otherUserSocketID = getSocketId(otheruser);
             const ou = checkMatch.records[0].get("ou").properties;
+            const currentUserSocketId = getSocketId(username);
 
-            io.to(currentUserSocketID).emit("newMatch", ou);
+            try {
+                const title = "New Match";
+                const currentUserDescription = "You have a new match with " + ou.fullName;
+                const avatar = ou.avatar;
 
-            const currentUserNoti = createNotification(username, "New Match", `You have a new match with ${ou.username}`);
-            const otherUserNoti = createNotification(otheruser, "New Match", `You have a new match with ${username}`);
+                const currentUserNotification = await session.run(
+                    `
+                        CREATE (n:Notification {
+                            title: $title,
+                            description: $currentUserDescription,
+                            username: $username,
+                            otheruser:$otheruser,
+                            notificationAvatar:$avatar,
+                            createdAt: timestamp()
+                        })
+                        RETURN n
+                `,
+                    { title, currentUserDescription, username, otheruser, avatar }
+                );
 
-            io.to(currentUser).emit("newNotification", currentUserNoti);
-            io.to(otherUserSocketID).emit("newNotification", otherUserNoti);
+                const otherAvatar = req.user.avatar;
+                const otherUserDescription = "You have a new match with " + req.user.fullName;
+                const otherUserNotification = await session.run(
+                    `
+                        CREATE (n:Notification {
+                            title: $title,
+                            description: $otherUserDescription,
+                            username: $otheruser,
+                            otheruser:$username,
+                            notificationAvatar:$otherAvatar,
+                            createdAt: timestamp()
+                        })
+                        RETURN n
+                `,
+                    { title, otherUserDescription, username, otheruser, otherAvatar }
+                );
+
+                const sendCurrentUserNotification = currentUserNotification.records[0].get("n").properties;
+                const sendOtherUserNotification = otherUserNotification.records[0].get("n").properties;
+
+                const otherUserSocketId = getSocketId(otheruser);
+
+                if (currentUserSocketId) {
+                    io.to(currentUserSocketId).emit("notification", sendCurrentUserNotification);
+                    io.to(currentUserSocketId).emit("newMatch", ou);
+                }
+
+                if (otherUserSocketId) {
+                    io.to(otherUserSocketId).emit("notification", sendOtherUserNotification);
+                    io.to(otherUserSocketId).emit("newMatch", req.user);
+                }
+
+            } catch (error) {
+                throw new APIError(error.statusCode, error.message);
+            }
 
             res.status(200).json(new APIResponse(200, "match", ou));
+            return;
         }
 
         res.status(200).json(new APIResponse(200, "Match created successfully !!"));
